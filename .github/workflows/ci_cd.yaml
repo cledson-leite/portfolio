@@ -9,32 +9,49 @@ on:
       - production
 
 jobs:
-  deploy:
+  EC2-Deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: AWS
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v2
+      - name: Checkout Repository
+        uses: actions/checkout@v3
 
-      - name: Build Docker Image
-        run: |
-          docker build -t silvafamily/teste_caprover .
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
 
-      - name: Log in to Docker Hub
-        run: |
-          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+      - name: Cache Yarn dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.yarn/cache
+            **/node_modules
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
 
-      - name: Push Docker Image
-        run: |
-          docker push silvafamily/teste_caprover
+      - name: Install Dependencies
+        run: yarn install --frozen-lockfile
 
-      - name: Deploy to CapRover
-        env:
-          CAPROVER_SERVER: ${{ secrets.CAPROVER_SERVER }}
-          CAPROVER_APP_NAME: ${{ secrets.CAPROVER_APP_NAME }}
-          CAPROVER_TOKEN: ${{ secrets.CAPROVER_TOKEN }}
-        run: |
-          curl -X POST "${CAPROVER_SERVER}/api/v2/apps/${CAPROVER_APP_NAME}/deploy" \
-          -H "Authorization: Bearer ${CAPROVER_TOKEN}" \
-          -H "Content-Type: application/json" \
-          -d '{"image": "silvafamily/teste_caprover"}'
+      - name: TypeScript Check
+        run: yarn tsc --noEmit
+
+      - name: Lint Code
+        run: yarn lint
+
+      - name: Build Application
+        run: yarn build
+
+      - name: Run Tests
+        run: yarn test
+
+      - id: deploy
+        uses: bitovi/github-actions-deploy-docker-to-ec2@v1.0.0
+        with:
+          checkout: false
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_ACCESS_KEY_VALUE }}
+          aws_elb_app_port: 8080
