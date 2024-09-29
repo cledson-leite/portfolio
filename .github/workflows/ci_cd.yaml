@@ -15,7 +15,7 @@ jobs:
 
       - name: Build Docker Image
         run: |
-          docker build -t teste .
+          docker build -t teste-caprover .
 
       - name: Log in to Docker Hub
         run: |
@@ -23,7 +23,7 @@ jobs:
 
       - name: Push Docker Image
         run: |
-          docker push teste
+          docker push teste-caprover
 
       - name: Deploy to CapRover
         env:
@@ -34,4 +34,4 @@ jobs:
           curl -X POST "${CAPROVER_SERVER}/api/v2/apps/${CAPROVER_APP_NAME}/deploy" \
           -H "Authorization: Bearer ${CAPROVER_TOKEN}" \
           -H "Content-Type: application/json" \
-          -d '{"image": "teste"}'
+          -d '{"image": "teste-caprover"}'
