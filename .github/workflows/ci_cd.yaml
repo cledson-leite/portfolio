@@ -15,7 +15,7 @@ jobs:
 
       - name: Build Docker Image
         run: |
-          docker build -t teste-caprover .
+          docker build -t silvafamily/teste-caprover:latest .
 
       - name: Log in to Docker Hub
         run: |
@@ -23,7 +23,7 @@ jobs:
 
       - name: Push Docker Image
         run: |
-          docker push teste-caprover
+          docker push silvafamily/teste-caprover:latest
 
       - name: Deploy to CapRover
         env:
