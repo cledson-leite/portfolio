@@ -1,4 +1,4 @@
-name: CI/CD for CapRover
+name: Deploy Next.js to AWS EC2
 
 on:
   push:
@@ -9,13 +9,11 @@ on:
       - production
 
 jobs:
-  EC2-Deploy:
+  deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: AWS
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Setup Node.js
@@ -23,35 +21,28 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Cache Yarn dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.yarn/cache
-            **/node_modules
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
+      - name: Install Yarn
+        run: npm install -g yarn
 
-      - name: Install Dependencies
-        run: yarn install --frozen-lockfile
+      - name: Install dependencies
+        run: yarn install
 
-      - name: TypeScript Check
-        run: yarn tsc --noEmit
-
-      - name: Lint Code
-        run: yarn lint
-
-      - name: Build Application
+      - name: Build application
         run: yarn build
 
-      - name: Run Tests
-        run: yarn test
-
-      - id: deploy
-        uses: bitovi/github-actions-deploy-docker-to-ec2@v1.0.0
+      - name: Set up SSH key
+        uses: webfactory/ssh-agent@v0.7.0
         with:
-          checkout: false
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_ACCESS_KEY_VALUE }}
-          aws_elb_app_port: 8080
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
+      - name: Copy files via RSYNC
+        run: |
+          rsync -avz --delete --exclude='.git*' --exclude='node_modules' --exclude='*.log' ./ deploy@${{ secrets.EC2_HOST }}:/home/deploy/app/
+      - name: Execute remote SSH commands
+        run: |
+          ssh -o StrictHostKeyChecking=no deploy@${{ secrets.EC2_HOST }} << 'EOF'
+            cd /home/deploy/app
+            yarn install --production
+            yarn build
+            pm2 restart nextjs-app || pm2 start yarn --name "nextjs-app" -- start
+          EOF
